@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>E-Commerce Revenue Forecaster</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
+</head>
+<body>
+<header class="top">
+  <h1>E-Commerce Revenue Forecaster</h1>
+  <p>Choose a period to see the expected revenue after {{ last_date }}, the last day in our sales data.</p>
+</header>
+
+<main class="layout">
+  <form class="controls" method="get" action="{{ url_for('index') }}">
+    <label for="days">Forecast period</label>
+    <select id="days" name="days">
+      {% for h in horizons %}
+      <option value="{{ h }}" {% if h == selected_days %}selected{% endif %}>Next {{ h }} days</option>
+      {% endfor %}
+    </select>
+    <button type="submit">Generate forecast</button>
+
+    <section class="accuracy">
+      <h2>How accurate is this?</h2>
+      <p class="hint">Tested on {{ metrics.test_period[0] }} to {{ metrics.test_period[1] }}, months the model never saw.</p>
+      <table>
+        <tr><th>Average miss per day</th><th>Model</th><th>Recent average</th></tr>
+        {% for h in ['7', '30', '90'] %}
+        <tr><td>Next {{ h }} days</td>
+            <td>{{ metrics.recursive[h].model.MAE | money }}</td>
+            <td>{{ metrics.recursive[h].flat_avg30.MAE | money }}</td></tr>
+        {% endfor %}
+      </table>
+      <p class="hint">"Recent average" is a plain guess: the average of the last 30 days, repeated. The model and this guess are about equally accurate, because daily revenue in this data moves mostly at random.</p>
+    </section>
+  </form>
+
+  <section class="results" aria-live="polite">
+    {% if error %}
+      <p class="error">{{ error }}</p>
+    {% elif result %}
+      <h2 class="headline">Expected revenue, next {{ result.days }} days: <strong>{{ result.total | money }}</strong></h2>
+      <p class="sub">{{ result.start }} to {{ result.end }}. Likely total between {{ result.low | money }} and {{ result.high | money }}.</p>
+
+      <dl class="facts">
+        <div><dt>Average per day</dt><dd>{{ result.avg | money }}</dd></div>
+        <div><dt>A single day usually lands between</dt><dd>{{ result.day_low | money }} and {{ result.day_high | money }}</dd></div>
+        <div><dt>Average of the last 30 real days</dt><dd>{{ result.recent_avg | money }}</dd></div>
+      </dl>
+
+      <div id="chart-forecast" class="chart"></div>
+      <div id="chart-bars" class="chart short"></div>
+
+      <p class="note">The forecast stays close to the typical daily level because past revenue shows no strong weekly or seasonal pattern. Totals are far more certain than single days, since good and bad days cancel out. Ranges cover about 80% of past outcomes and assume the business keeps behaving as it did in the last two years.</p>
+      <script>
+        const d = {{ result.chart | tojson }};
+        const font = {family: "IBM Plex Sans, sans-serif", color: "#1F2937"};
+        const clear = "rgba(0,0,0,0)";
+        Plotly.newPlot("chart-forecast", [
+          {x: d.hist_x, y: d.hist_y, name: "Past revenue", mode: "lines", line: {color: "#3B6FD4", width: 1.6}},
+          {x: d.fc_x, y: d.hi_y, mode: "lines", line: {width: 0}, showlegend: false, hoverinfo: "skip"},
+          {x: d.fc_x, y: d.lo_y, name: "Likely range, single day", mode: "lines", line: {width: 0}, fill: "tonexty", fillcolor: "rgba(194,101,15,0.16)", hoverinfo: "skip"},
+          {x: d.fc_x, y: d.fc_y, name: "Forecast", mode: "lines", line: {color: "#C2650F", width: 2.4}}
+        ], {title: {text: "Daily revenue: past and forecast", font: {size: 15}}, font,
+            yaxis: {title: "Revenue per day", tickformat: ",.0f", gridcolor: "#E5E7EB"}, xaxis: {gridcolor: "#E5E7EB"},
+            margin: {t: 48, r: 12, l: 76, b: 40}, legend: {orientation: "h", y: -0.18},
+            paper_bgcolor: clear, plot_bgcolor: clear},
+          {responsive: true, displayModeBar: false});
+        Plotly.newPlot("chart-bars", [
+          {x: d.bar_x, y: d.bar_y, type: "bar", marker: {color: "#C2650F"}, hovertemplate: "%{y:,.0f}<extra></extra>"}
+        ], {title: {text: d.bar_title, font: {size: 15}}, font, yaxis: {title: "Revenue", tickformat: ",.0f", gridcolor: "#E5E7EB", rangemode: "tozero"},
+            margin: {t: 48, r: 12, l: 76, b: 56}, paper_bgcolor: clear, plot_bgcolor: clear},
+          {responsive: true, displayModeBar: false});
+      </script>
+    {% else %}
+      <div class="empty">
+        <h2>No forecast yet</h2>
+        <p>Pick a period on the left, then choose Generate forecast.</p>
+      </div>
+    {% endif %}
+  </section>
+</main>
+</body>
+</html>
