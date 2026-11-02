@@ -1,6 +1,0 @@
-,MAE,RMSE,MAPE,WAPE,R2
-Yesterday's revenue,8530.479,10458.909,19.52,19.133,-1.074
-Same weekday last week,8553.98,10653.217,19.75,19.186,-1.151
-Average of last 30 days,5969.719,7455.114,13.901,13.389,-0.054
-Training-period average,5815.017,7283.283,13.624,13.042,-0.006
-Random Forest (Person 3),5786.015,7290.583,13.444,12.977,-0.008
